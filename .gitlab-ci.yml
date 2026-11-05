@@ -1,8 +1,11 @@
-# GitLab-Pipeline für die Beispielanwendung.
+# GitLab-Pipeline für einen Runner mit Kubernetes-Executor (Docker im Pod).
 #
 # Zwei Stufen, eine übliche Aufteilung:
 #   1. test        schnelle Unit-Tests, bei jedem Push, brauchen kein Docker
 #   2. integration echte Container (Datenbank, Stub, WildFly), brauchen Docker
+#
+# Beim Kubernetes-Executor läuft jeder Job als Pod. Der Job-Container und der Docker-Dienst (dind)
+# sind Container desselben Pods und teilen sich localhost.
 
 stages:
   - test
@@ -34,8 +37,9 @@ unit-tests:
 
 # ---- Stufe 2: Integrationstests ----------------------------------------------------------------------
 # Die Tests starten per Testcontainers eigene Container. Dafür braucht der Job Zugriff auf Docker.
-# Hier über Docker-in-Docker (dind): Ein zweiter Container ("docker") stellt einen Docker-Dienst bereit.
-# Das setzt einen Runner im privilegierten Modus voraus.
+# Hier läuft der Docker-Dienst (dind) als weiterer Container im Pod. Das setzt voraus, dass der Runner
+# privilegierte Container erlaubt (privileged = true in der Runner-Konfiguration).
+# Die Testcontainer (Datenbank, Stub, WildFly) laufen innerhalb des dind-Containers, ihr Speicher zählt dort.
 integration-tests:
   stage: integration
   image: maven:3.9-eclipse-temurin-21
@@ -43,14 +47,27 @@ integration-tests:
     - name: docker:27-dind
       alias: docker
       command: ["--tls=false"]
+      variables:
+        # Der Runner wartet, bis der Docker-Dienst auf diesem Port antwortet, bevor der Job startet.
+        HEALTHCHECK_TCP_PORT: "2375"
+        # Speicher und CPU für den Docker-Dienst und damit für die drei Testcontainer.
+        # Gemessene Spitze unter Docker Desktop: etwa 1,5 GiB.
+        KUBERNETES_SERVICE_MEMORY_REQUEST: "2Gi"
+        KUBERNETES_SERVICE_MEMORY_LIMIT: "3Gi"
+        KUBERNETES_SERVICE_CPU_REQUEST: "1"
   variables:
-    DOCKER_HOST: tcp://docker:2375
+    # Job und Dienst teilen sich im Pod localhost.
+    DOCKER_HOST: tcp://localhost:2375
     DOCKER_TLS_CERTDIR: ""
-    # Die Container der Tests laufen im dind-Dienst, nicht im Job. Testcontainers muss sie dort ansprechen.
-    TESTCONTAINERS_HOST_OVERRIDE: docker
+    TESTCONTAINERS_HOST_OVERRIDE: localhost
+    # Speicher für den Job-Container (Maven und Docker-Client). Gemessene Spitze unter Docker Desktop: etwa 0,7 GiB.
+    KUBERNETES_MEMORY_REQUEST: "1Gi"
+    KUBERNETES_MEMORY_LIMIT: "3Gi"
   before_script:
     # Die Maven-Image bringt keinen Docker-Client mit. Er wird für "docker build" im Maven-Lauf gebraucht.
     - apt-get update -qq && apt-get install -y -qq docker.io > /dev/null
+    # Zur Sicherheit auf den Docker-Dienst warten, falls der Runner das nicht selbst tut.
+    - for i in $(seq 1 60); do docker info >/dev/null 2>&1 && break; sleep 2; done
     - docker version --format 'Docker-Server {{.Server.Version}}'
   script:
     - cd app

@@ -175,18 +175,30 @@ Das Server-Image baut Maven vor den Tests per `docker build` (siehe `pom.xml`, `
 
 ## GitLab-Pipeline
 
+Dieser Branch (`gitlab-kubernetes-runner`) enthält die Pipeline für einen Runner mit **Kubernetes-Executor**, bei dem Docker als Dienst im Pod des Jobs läuft. Der Branch `main` enthält die Variante für einen Runner mit Docker-Executor.
+
 `.gitlab-ci.yml` hat zwei Stufen:
 
 1. **`test`**: die Unit-Tests, ohne Docker, bei jedem Push
-2. **`integration`**: `mvn verify` mit Docker-in-Docker (der Dienst `docker:27-dind` stellt den Docker-Zugang), nur auf dem Hauptzweig und in Merge Requests
+2. **`integration`**: `mvn verify` mit Docker-in-Docker. Der Dienst `docker:27-dind` läuft als weiterer Container im Pod des Jobs, beide teilen sich `localhost`. Die Stufe läuft nur auf dem Hauptzweig und in Merge Requests.
 
-**Ohne GitLab nachstellen:** Die Befehle des Jobs `integration-tests` (Variablen, `before_script`, `script`) lassen sich in einem Maven-Container ausführen, neben einem privilegierten `docker:27-dind` im selben Docker-Netz. Der Dienst heißt dort `docker`, wie in der Pipeline-Datei.
+**Ohne GitLab und ohne Kubernetes nachstellen:** Die Befehle des Jobs `integration-tests` (Variablen, `before_script`, `script`) lassen sich in einem Maven-Container ausführen. Der privilegierte Docker-Dienst (`docker:27-dind`) läuft im selben Netzwerk-Namensraum wie dieser Container, so wie die Container eines Pods. Beide sprechen sich nur über `localhost` an.
 
-**Was das zeigt und was nicht:** Es zeigt, dass die Befehle und der Docker-in-Docker-Zugang zusammenpassen. Es zeigt nicht, wie GitLab die Datei auslegt: Ablauf der Stufen, `rules`, Cache, Testberichte und das Verhalten eines echten privilegierten Runners sind nicht geprüft.
+**Was das zeigt und was nicht:** Es zeigt, dass die Befehle und der Zugang über `localhost` zusammenpassen. Gemessener Speicher beim Nachstellen unter Docker Desktop (alle 10 Sekunden): Spitze im Job-Container etwa 0,7 GiB, im Docker-Dienst mit den drei Testcontainern etwa 1,5 GiB. Es zeigt nicht, wie ein Kubernetes-Runner die Datei ausführt: `privileged = true`, die Freigabe der Ressourcen-Variablen, `HEALTHCHECK_TCP_PORT`, `rules`, Cache, Testberichte und das Laden der Images im Cluster sind nicht geprüft.
+
+### Kubernetes-Executor: Docker im Pod
+
+Was der Betreiber des Runners einstellen muss. Das folgt der GitLab-Dokumentation zum Kubernetes-Executor und ist in keinem Cluster erprobt:
+
+* **Privilegierte Container.** Docker-in-Docker braucht `privileged = true` in der Runner-Konfiguration (`[runners.kubernetes]`). Die Doku warnt, dass dabei der Kernel des Knotens für die Job-Container erreichbar werden kann, und empfiehlt, solche Jobs mit einem `node_selector` auf eigene Knoten zu legen.
+* **Ressourcen per Variable.** `KUBERNETES_MEMORY_REQUEST` und `KUBERNETES_MEMORY_LIMIT` gelten für den Job-Container, am Dienst heißen sie `KUBERNETES_SERVICE_…`. Sie wirken nur, wenn der Betreiber die jeweilige `…_overwrite_max_allowed`-Einstellung setzt, für Dienste mit dem Präfix `service_`. Sonst gilt laut Doku: „If the maximum overwrite has not been set for a resource, the variable is not used.“ Der Speicher der Testcontainer zählt zum Docker-Dienst, nicht zum Job-Container.
+* **`DOCKER_HOST`.** Job und Dienst teilen sich `localhost`. Neuere Runner erreichen Dienste laut Doku auch über ihren Namen (`docker`), ältere nur über `localhost`. Mit `localhost` geht beides.
+* **Warten auf den Dienst.** `HEALTHCHECK_TCP_PORT` lässt den Runner warten, bis der Dienst antwortet. Zusätzlich wartet das `before_script` auf `docker info`.
+* **Images.** Datenbank, Stub und Server-Image lädt der Docker-Dienst, nicht der Cluster. Docker-Hub-Grenzen und interne Registries gelten dort. Die Doku nennt einen Registry-Mirror für den dind-Dienst.
 
 ### OpenShift
 
-Läuft der Runner selbst in OpenShift (Kubernetes-Executor), gibt es dort meist keinen privilegierten Container und damit kein Docker-in-Docker. Dann bleiben drei Wege:
+Dieser Branch setzt privilegierte Container voraus. Läuft der Runner selbst in OpenShift (Kubernetes-Executor), gibt es dort meist keinen privilegierten Container und damit kein Docker-in-Docker. Dann bleiben drei Wege:
 
 * **GitLab-Services:** Datenbank und Stub als Nachbar-Container (`services:`) starten, die Tests sprechen sie an. Das ersetzt Testcontainers.
 * **Eigener Runner mit Docker** nur für die Integrationsstufe.
