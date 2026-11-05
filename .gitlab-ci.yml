@@ -1,0 +1,68 @@
+# GitLab-Pipeline für die Beispielanwendung.
+#
+# Zwei Stufen, eine übliche Aufteilung:
+#   1. test        schnelle Unit-Tests, bei jedem Push, brauchen kein Docker
+#   2. integration echte Container (Datenbank, Stub, WildFly), brauchen Docker
+
+stages:
+  - test
+  - integration
+
+default:
+  image: maven:3.9-eclipse-temurin-21
+
+variables:
+  # Das Maven-Repository liegt im Projekt, damit GitLab es zwischen den Läufen zwischenspeichern kann.
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  MAVEN_CLI_OPTS: "-B --no-transfer-progress"
+
+cache:
+  key: maven
+  paths:
+    - .m2/repository
+
+# ---- Stufe 1: Unit-Tests ---------------------------------------------------------------------------
+unit-tests:
+  stage: test
+  script:
+    - cd app
+    - mvn $MAVEN_CLI_OPTS test
+  artifacts:
+    when: always
+    reports:
+      junit: app/target/surefire-reports/TEST-*.xml
+
+# ---- Stufe 2: Integrationstests ----------------------------------------------------------------------
+# Die Tests starten per Testcontainers eigene Container. Dafür braucht der Job Zugriff auf Docker.
+# Hier über Docker-in-Docker (dind): Ein zweiter Container ("docker") stellt einen Docker-Dienst bereit.
+# Das setzt einen Runner im privilegierten Modus voraus.
+integration-tests:
+  stage: integration
+  image: maven:3.9-eclipse-temurin-21
+  services:
+    - name: docker:27-dind
+      alias: docker
+      command: ["--tls=false"]
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+    # Die Container der Tests laufen im dind-Dienst, nicht im Job. Testcontainers muss sie dort ansprechen.
+    TESTCONTAINERS_HOST_OVERRIDE: docker
+  before_script:
+    # Die Maven-Image bringt keinen Docker-Client mit. Er wird für "docker build" im Maven-Lauf gebraucht.
+    - apt-get update -qq && apt-get install -y -qq docker.io > /dev/null
+    - docker version --format 'Docker-Server {{.Server.Version}}'
+  script:
+    - cd app
+    # "verify" baut die WAR, danach das Image (docker build), dann laufen die Integrationstests (Failsafe).
+    - mvn $MAVEN_CLI_OPTS verify
+  artifacts:
+    when: always
+    reports:
+      junit:
+        - app/target/surefire-reports/TEST-*.xml
+        - app/target/failsafe-reports/TEST-*.xml
+  # Integrationstests laufen auf dem Hauptzweig und in Merge Requests, nicht bei jedem Push auf jeden Zweig.
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

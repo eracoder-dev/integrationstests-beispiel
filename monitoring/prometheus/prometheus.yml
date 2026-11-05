@@ -1,0 +1,38 @@
+# Prometheus holt Zahlen ab (scrape) und prüft Health Checks über den Blackbox Exporter.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alarme.yml
+
+scrape_configs:
+  # Metriken des Anwendungsservers: Datenbank-Pool, Transaktionen, Batch-Threads, Speicher, Requests
+  - job_name: wildfly
+    metrics_path: /metrics
+    # WildFly schickt beim Abruf keinen Content-Type mit. Prometheus 3 lehnt das ohne diese Angabe ab.
+    fallback_scrape_protocol: PrometheusText0.0.4
+    static_configs:
+      - targets: ["wildfly:9990"]
+
+  # Health Checks: Der Blackbox Exporter ruft die Adresse auf und liefert probe_success (1 = ok, 0 = Fehler)
+  - job_name: health
+    metrics_path: /probe
+    params:
+      module: [health]
+    static_configs:
+      - targets:
+          - http://wildfly:9990/health/live
+          - http://wildfly:9990/health/ready
+          - http://wildfly:9990/health/started
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

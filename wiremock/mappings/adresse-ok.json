@@ -1,0 +1,11 @@
+{
+  "name": "Adresse gültig (Standard)",
+  "priority": 10,
+  "request": { "method": "GET", "urlPath": "/adressen/pruefen" },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "gueltig": true },
+    "fixedDelayMilliseconds": 80
+  }
+}

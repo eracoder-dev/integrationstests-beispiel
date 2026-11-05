@@ -1,0 +1,6 @@
+{
+  "name": "Adresse fachlich ungültig (PLZ 11111)",
+  "priority": 1,
+  "request": { "method": "GET", "urlPath": "/adressen/pruefen", "queryParameters": { "plz": { "equalTo": "11111" } } },
+  "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "jsonBody": { "gueltig": false, "grund": "Straße und Ort passen nicht zusammen" } }
+}

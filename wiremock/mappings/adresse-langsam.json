@@ -1,0 +1,6 @@
+{
+  "name": "Dienst antwortet sehr langsam (PLZ 99999)",
+  "priority": 1,
+  "request": { "method": "GET", "urlPath": "/adressen/pruefen", "queryParameters": { "plz": { "equalTo": "99999" } } },
+  "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "jsonBody": { "gueltig": true }, "fixedDelayMilliseconds": 6000 }
+}

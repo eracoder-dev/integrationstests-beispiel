@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Antragsbearbeitung Beispielanwendung</title>
+<style>
+  :root {
+    --bg: #f4f5f3; --flaeche: #ffffff; --flaeche2: #eceeea; --text: #1b2220; --text2: #46514d; --text3: #6b7672;
+    --linie: #d3d8d3; --akzent: #1f5c86; --akzent-text: #ffffff; --ok: #2b7647; --ok-bg: #dbeee1;
+    --warn: #9a6405; --warn-bg: #f5e9cd; --fehler: #ab3f2c; --fehler-bg: #f5e0da; --code-bg: #14201c; --code-text: #d6e4dc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121615; --flaeche: #1a201e; --flaeche2: #222a27; --text: #e3e8e5; --text2: #b2bcb7; --text3: #89948f;
+      --linie: #2f3935; --akzent: #6ba9d4; --akzent-text: #0c1923; --ok: #6cbf8a; --ok-bg: #1b3125;
+      --warn: #dfa848; --warn-bg: #382d16; --fehler: #e6826d; --fehler-bg: #3a221c; --code-bg: #0c1311; --code-text: #cfe0d6;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, "Segoe UI", sans-serif; color: var(--text); background: var(--bg); }
+  header { padding: 18px 20px 8px; max-width: 1280px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  h2 { font-size: 1.02rem; margin: 0 0 8px; }
+  p { margin: 0 0 8px; color: var(--text2); }
+  .links a { color: var(--akzent); margin-right: 14px; }
+  .raster { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; max-width: 1280px; margin: 0 auto; padding: 8px 20px 40px; align-items: start; }
+  @media (max-width: 900px) { .raster { grid-template-columns: minmax(0, 1fr); } }
+  .karte { background: var(--flaeche); border: 1px solid var(--linie); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+  .reihe { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin: 6px 0; }
+  label { font-size: .85rem; color: var(--text2); display: grid; gap: 2px; }
+  input { font: inherit; padding: 6px 8px; border: 1px solid var(--linie); border-radius: 6px; width: 9em; color: var(--text); background: var(--flaeche); }
+  button { font: inherit; padding: 7px 12px; border: 1px solid var(--akzent); background: var(--akzent); color: var(--akzent-text); border-radius: 6px; cursor: pointer; }
+  button:hover { filter: brightness(1.08); }
+  button.leise { background: transparent; color: var(--akzent); }
+  button.ja { background: var(--ok); border-color: var(--ok); color: var(--akzent-text); }
+  button.nein { background: var(--fehler); border-color: var(--fehler); color: var(--akzent-text); }
+  button:disabled { opacity: .5; cursor: wait; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--linie); vertical-align: middle; }
+  th { color: var(--text3); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+  td.knoepfe { white-space: nowrap; text-align: right; }
+  .marke { display: inline-block; font-size: .75rem; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--flaeche2); color: var(--text2); }
+  .marke.ok { background: var(--ok-bg); color: var(--ok); }
+  .marke.warn { background: var(--warn-bg); color: var(--warn); }
+  .marke.fehler { background: var(--fehler-bg); color: var(--fehler); }
+  .leer { color: var(--text3); padding: 10px 0; }
+  .klein { font-size: .85rem; color: var(--text3); }
+  /* Detailfenster */
+  .detail { position: sticky; top: 12px; }
+  .detail h2 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .kopf { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  pre { background: var(--code-bg); color: var(--code-text); border-radius: 8px; padding: 10px 12px; overflow: auto; max-height: 260px; margin: 6px 0 10px; font: .8rem/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+  .abschnitt { font-size: .78rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text3); margin: 10px 0 2px; display: flex; justify-content: space-between; align-items: center; }
+  .abschnitt button { padding: 2px 8px; font-size: .75rem; }
+  .erklaerung { background: var(--flaeche2); border-radius: 8px; padding: 8px 10px; color: var(--text2); font-size: .9rem; }
+  .erklaerung ol { margin: 4px 0 0; padding-left: 1.2em; }
+  .verlauf { list-style: none; margin: 0; padding: 0; max-height: 180px; overflow: auto; }
+  .verlauf li { padding: 4px 6px; border-radius: 6px; cursor: pointer; display: flex; gap: 8px; font-size: .85rem; align-items: baseline; }
+  .verlauf li:hover, .verlauf li.aktiv { background: var(--flaeche2); }
+  .verlauf .zeit { color: var(--text3); font-variant-numeric: tabular-nums; }
+  .verlauf .pfad { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Antragsbearbeitung Beispielanwendung</h1>
+  <p>WildFly, MicroProfile, Camunda 7, Jakarta Batch und ELK. Rechts im Detailfenster siehst du bei jedem Klick den Befehl, der im Hintergrund ausgeführt wird.</p>
+  <p class="links">
+    <a href="/openapi" target="_blank" rel="noopener">OpenAPI</a>
+    <a href="http://localhost:9990/health" target="_blank" rel="noopener">Health</a>
+    <a href="http://localhost:9990/metrics" target="_blank" rel="noopener">Metriken</a>
+    <a href="http://localhost:8083/camunda/app/cockpit/default/" target="_blank" rel="noopener">Camunda Cockpit</a>
+    <a href="http://localhost:5601/app/discover" target="_blank" rel="noopener">Kibana</a>
+  </p>
+</header>
+
+<div class="raster">
+  <main>
+    <section class="karte">
+      <h2>Offene Aufgaben</h2>
+      <div class="reihe">
+        <label>Benutzer im Audit <input id="benutzer" value="pruefer-paul"></label>
+        <button class="leise" id="aufgabenLaden">Neu laden</button>
+      </div>
+      <div id="aufgaben"><div class="leer">Lade ...</div></div>
+      <p class="klein">Annehmen und Ablehnen schließen die Aufgabe in Camunda ab. Danach läuft der Prozess weiter, der Antrag wird policiert oder abgelehnt.</p>
+    </section>
+
+    <section class="karte">
+      <h2>Neuer Antrag</h2>
+      <p class="klein">Die PLZ steuert den Adressdienst: 80331 gültig, 00000 Ausfall, 99999 langsam, 11111 ungültig, 22222 jeder zweite Aufruf fällt aus. Summen über 300.000 gehen in die manuelle Prüfung. Der Name steuert die SOAP-Bonitätsauskunft: enthält er „Schlecht“, ist die Bonität schlecht, bei „Fehler“ antwortet der Dienst mit einem SOAP-Fault, bei „Langsam“ erst nach 6 Sekunden. Alle drei Fälle gehen in die manuelle Prüfung.</p>
+      <div class="reihe">
+        <label>Name <input id="name" value="Erika Mustermann" style="width:11em"></label>
+        <label>PLZ <input id="plz" value="80331" style="width:5em"></label>
+        <label>Ort <input id="ort" value="Muenchen" style="width:8em"></label>
+        <label>Summe <input id="summe" value="150000" style="width:7em"></label>
+        <button id="antrag">Antrag erfassen</button>
+      </div>
+      <div class="reihe">
+        <label>Antragsnummer <input id="antragsnummer" placeholder="A00000015"></label>
+        <button class="leise" id="antragStatus">Status abfragen</button>
+        <button class="leise" id="audit">Audit anzeigen</button>
+      </div>
+    </section>
+
+    <section class="karte">
+      <h2>Sollstellung (Jakarta Batch)</h2>
+      <div class="reihe">
+        <label>Monat <input id="monat" value="2027-05" style="width:6em"></label>
+        <label>Abbruch nach <input id="failAfter" value="0" style="width:5em"></label>
+        <button id="batch">Lauf direkt starten</button>
+        <button class="leise" id="prozess">Als Camunda-Prozess starten</button>
+        <button class="leise" id="forderungen">Forderungen zählen</button>
+      </div>
+      <div class="reihe">
+        <label>Ausführung <input id="ausfuehrung" style="width:5em"></label>
+        <button class="leise" id="status">Status</button>
+        <button class="leise" id="neustart">Neu starten</button>
+      </div>
+    </section>
+
+    <section class="karte">
+      <h2>Fault Tolerance (Adressdienst)</h2>
+      <div class="reihe">
+        <label>PLZ <input id="plz2" value="00000" style="width:5em"></label>
+        <button id="adresse">Adressdienst aufrufen</button>
+        <button class="leise" id="serie">10 Aufrufe nacheinander</button>
+      </div>
+    </section>
+  </main>
+
+  <aside class="karte detail" aria-live="polite">
+    <h2>Detailfenster</h2>
+    <div id="detail"><div class="leer">Noch nichts ausgeführt. Klicke einen Knopf, dann erscheint hier der Befehl.</div></div>
+    <div class="abschnitt">Verlauf</div>
+    <ul class="verlauf" id="verlauf"></ul>
+  </aside>
+</div>
+
+<script>
+const KIBANA = 'http://localhost:5601/app/discover#/?_g=(time:(from:now-1h,to:now))&_a=(query:(language:kuery,query:';
+const verlauf = [];
+
+// Was im Hintergrund passiert, je nach Aufruf
+const ERKLAERUNGEN = [
+  [/^POST \/api\/aufgaben\/[^/]+\/abschluss$/, [
+    'Der Aufruf kommt im JAX-RS-Filter an und bekommt eine Korrelations-ID, den Benutzer aus X-Benutzer und ein Eintrag im Audit.',
+    'Camunda schließt die Aufgabe ab und schreibt die Entscheidung als Prozessvariable.',
+    'Das Gateway „Entscheidung“ wählt den Weg. Der Service Task „Police erstellen“ oder „Antrag ablehnen“ läuft in derselben Transaktion.',
+    'Der Delegate setzt den Status des Antrags in der Datenbank und schreibt einen Audit-Eintrag. Alles wird gemeinsam festgeschrieben.']],
+  [/^POST \/api\/antraege$/, [
+    'Die Eingabe wird per Bean Validation geprüft. Der Antrag wird gespeichert und bekommt seine Nummer.',
+    'Camunda startet den Prozess „antrag“ in derselben Transaktion. Der erste Schritt ist asynchron.',
+    'Der Aufruf kehrt sofort mit 202 zurück. Der Job Executor ruft danach den Adressdienst auf, geschützt durch Timeout, Retry, Circuit Breaker und Fallback.',
+    'Frage nach ein paar Sekunden den Status ab oder sieh in die Aufgabenliste.']],
+  [/^POST \/api\/batch\/sollstellung$/, [
+    'JBeret legt eine Job-Ausführung im Repository (Datenbank) an und startet den Job in einem eigenen Thread.',
+    'Der Reader liest je 500 Verträge nach Nummer, der Processor rechnet, der Writer schreibt mit „on conflict do nothing“. Jede Portion ist ein Commit mit Checkpoint.',
+    'Der Aufruf kehrt sofort zurück. Den Fortschritt siehst du mit „Status“.']],
+  [/^POST \/api\/batch\/[^/]+\/neustart$/, [
+    'JBeret sucht den letzten Checkpoint des abgebrochenen Laufs, die zuletzt gelesene Vertragsnummer.',
+    'Der Reader setzt dort wieder auf. Der Writer ist idempotent, es entsteht nichts doppelt.']],
+  [/^POST \/api\/prozesse\/sollstellung$/, [
+    'Camunda startet den Prozess „sollstellungslauf“. Der Service Task startet den Batchjob.',
+    'Danach prüft der Prozess alle 3 Sekunden den Status. Bei COMPLETED endet er, bei FAILED entsteht die Aufgabe „Fehler prüfen“.']],
+  [/^GET \/api\/adresse\/pruefen$/, [
+    'Die Anwendung ruft den Adressdienst (WireMock). Das Verhalten hängt von der PLZ ab.',
+    'Fault Tolerance greift: Timeout pro Versuch, bis zu 2 Wiederholungen, Circuit Breaker, Bulkhead und Fallback „OFFEN“.']],
+  [/^GET \/api\/aufgaben$/, ['Camunda liefert alle offenen User Tasks. Die Antragsnummer steht als Prozessvariable an der Aufgabe.']],
+  [/^GET \/api\/audit/, ['Die letzten Einträge der Audit-Tabelle: wer hat wann was entschieden oder gestartet.']],
+];
+
+function erklaerung(schluessel) {
+  for (const [muster, schritte] of ERKLAERUNGEN) if (muster.test(schluessel)) return schritte;
+  return null;
+}
+
+function curlBefehl(methode, url, kopfzeilen, body) {
+  const teile = ['curl -s'];
+  if (methode !== 'GET') teile.push('-X ' + methode);
+  teile.push("'" + url + "'");
+  for (const [k, v] of Object.entries(kopfzeilen)) teile.push("-H '" + k + ': ' + v + "'");
+  if (body) teile.push("-d '" + body + "'");
+  return teile.join(' \\\n  ');
+}
+
+function neueId() { return 'ui-' + Math.random().toString(36).slice(2, 8); }
+function html(t) { return String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+const wert = id => document.getElementById(id).value;
+
+// Ein API-Aufruf. Mit leise = true landet er nicht im Detailfenster (etwa für Hilfsabfragen der Liste).
+async function aufruf(methode, pfad, body, leise) {
+  const url = location.origin + '/api' + pfad;
+  const kopf = { 'X-Correlation-ID': neueId(), 'X-Benutzer': wert('benutzer') || 'demo' };
+  let text;
+  if (body !== undefined) { kopf['Content-Type'] = 'application/json'; text = JSON.stringify(body); }
+  const start = performance.now();
+  let status = 0, antwort = '', daten = null, fehler = null;
+  try {
+    const r = await fetch(url, { method: methode, headers: kopf, body: text });
+    status = r.status;
+    antwort = await r.text();
+    try { daten = JSON.parse(antwort); } catch { daten = antwort; }
+  } catch (e) { fehler = String(e); }
+  const eintrag = {
+    zeit: new Date().toLocaleTimeString('de-DE'), methode, pfad: '/api' + pfad, url, kopf, body: text,
+    status, ms: Math.round(performance.now() - start), antwort, fehler,
+    curl: curlBefehl(methode, url, kopf, text),
+    schluessel: methode + ' /api' + pfad.split('?')[0].replace(/\/(A\d+)$/, '/$1')
+  };
+  if (!leise) { verlauf.unshift(eintrag); if (verlauf.length > 30) verlauf.pop(); zeigeDetail(eintrag); zeigeVerlauf(eintrag); }
+  return { status, daten, eintrag };
+}
+
+function statusMarke(s) {
+  const klasse = s >= 200 && s < 300 ? 'ok' : s >= 400 || s === 0 ? 'fehler' : 'warn';
+  return '<span class="marke ' + klasse + '">' + (s || 'Fehler') + '</span>';
+}
+
+function kopieren(knopf, text) {
+  const fertig = () => { const alt = knopf.textContent; knopf.textContent = 'Kopiert'; setTimeout(() => knopf.textContent = alt, 1200); };
+  try { navigator.clipboard.writeText(text).then(fertig, () => {}); } catch (e) { /* ohne Zwischenablage nichts tun */ }
+}
+
+function zeigeDetail(e) {
+  const korr = e.kopf['X-Correlation-ID'];
+  let antwort = e.antwort;
+  try { antwort = JSON.stringify(JSON.parse(e.antwort), null, 2); } catch (x) { /* kein JSON */ }
+  const schritte = erklaerung(e.schluessel);
+  const kibana = KIBANA + encodeURIComponent("'korrelationsId:\"" + korr + "\"'") + '))';
+  document.getElementById('detail').innerHTML =
+    '<div class="kopf">' + statusMarke(e.status) + '<strong>' + html(e.methode) + ' ' + html(e.pfad) + '</strong>' +
+    '<span class="klein">' + e.ms + ' ms · ' + html(e.zeit) + '</span></div>' +
+    '<div class="abschnitt">Befehl im Hintergrund <button class="leise" id="kopierCurl">Kopieren</button></div>' +
+    '<pre>' + html(e.curl) + '</pre>' +
+    (schritte ? '<div class="abschnitt">Was dabei passiert</div><div class="erklaerung"><ol>' + schritte.map(s => '<li>' + html(s) + '</li>').join('') + '</ol></div>' : '') +
+    '<div class="abschnitt">Antwort</div><pre>' + html(e.fehler ? 'Fehler: ' + e.fehler : (antwort || '(leer)')) + '</pre>' +
+    '<p class="klein">Korrelations-ID <code>' + html(korr) + '</code> · <a href="' + html(kibana) + '" target="_blank" rel="noopener">Logs dazu in Kibana</a> (erscheinen nach wenigen Sekunden)</p>';
+  document.getElementById('kopierCurl').onclick = ev => kopieren(ev.target, e.curl);
+}
+
+function zeigeVerlauf(aktiv) {
+  const liste = document.getElementById('verlauf');
+  liste.innerHTML = '';
+  verlauf.forEach(e => {
+    const li = document.createElement('li');
+    if (e === aktiv) li.className = 'aktiv';
+    li.innerHTML = '<span class="zeit">' + html(e.zeit) + '</span>' + statusMarke(e.status) + '<span class="pfad">' + html(e.methode + ' ' + e.pfad) + '</span>';
+    li.onclick = () => { zeigeDetail(e); zeigeVerlauf(e); };
+    liste.appendChild(li);
+  });
+}
+
+// ---- Aufgabenliste ----
+// leise = true: Die Liste wird aktualisiert, ohne das Detailfenster zu überschreiben.
+async function aufgabenLaden(leise) {
+  const ziel = document.getElementById('aufgaben');
+  const r = await aufruf('GET', '/aufgaben', undefined, leise === true);
+  if (r.status !== 200) { ziel.innerHTML = '<div class="leer">Aufgaben konnten nicht geladen werden.</div>'; return; }
+  const aufgaben = r.daten;
+  if (!aufgaben.length) { ziel.innerHTML = '<div class="leer">Keine offenen Aufgaben.</div>'; return; }
+  // Namen und Summen der Anträge, ohne das Detailfenster zu füllen
+  const antraege = {};
+  await Promise.all(aufgaben.filter(a => a.antragsnummer).map(async a => {
+    const x = await aufruf('GET', '/antraege/' + a.antragsnummer, undefined, true);
+    if (x.status === 200) antraege[a.antragsnummer] = x.daten;
+  }));
+  const zeilen = aufgaben.map(a => {
+    const antrag = antraege[a.antragsnummer];
+    const knoepfe = a.antragsnummer
+      ? '<button class="ja" data-id="' + a.id + '" data-e="annehmen">Annehmen</button> <button class="nein" data-id="' + a.id + '" data-e="ablehnen">Ablehnen</button>'
+      : '<button data-id="' + a.id + '" data-e="annehmen">Abschließen</button>';
+    return '<tr><td>' + html(a.antragsnummer || '–') + '</td><td>' + html(a.name) + '</td>' +
+      '<td>' + (antrag ? html(antrag.name) + '<br><span class="klein">PLZ ' + html(antrag.plz) + ' · ' + Number(antrag.antragssumme).toLocaleString('de-DE') + ' €</span>' : '<span class="klein">Sollstellungslauf</span>') + '</td>' +
+      '<td class="knoepfe">' + knoepfe + '</td></tr>';
+  }).join('');
+  ziel.innerHTML = '<table><thead><tr><th>Antrag</th><th>Aufgabe</th><th>Antragsteller</th><th></th></tr></thead><tbody>' + zeilen + '</tbody></table>';
+  ziel.querySelectorAll('button[data-id]').forEach(b => b.onclick = async () => {
+    ziel.querySelectorAll('button').forEach(x => x.disabled = true);
+    const e = await aufruf('POST', '/aufgaben/' + b.dataset.id + '/abschluss', { entscheidung: b.dataset.e });
+    await aufgabenLaden(true);
+    return e;
+  });
+}
+
+// ---- übrige Knöpfe ----
+const an = (id, fn) => document.getElementById(id).onclick = fn;
+an('aufgabenLaden', () => aufgabenLaden(false));
+an('antrag', async () => {
+  const r = await aufruf('POST', '/antraege', { name: wert('name'), plz: wert('plz'), ort: wert('ort'), antragssumme: Number(wert('summe')) });
+  if (r.status === 202) { document.getElementById('antragsnummer').value = r.daten.antragsnummer; setTimeout(() => aufgabenLaden(true), 6000); }
+});
+an('antragStatus', () => aufruf('GET', '/antraege/' + wert('antragsnummer')));
+an('audit', () => aufruf('GET', '/audit?limit=15'));
+an('batch', async () => { const r = await aufruf('POST', '/batch/sollstellung?monat=' + wert('monat') + '&failAfter=' + wert('failAfter')); if (r.daten && r.daten.ausfuehrungsId) document.getElementById('ausfuehrung').value = r.daten.ausfuehrungsId; });
+an('prozess', async () => { await aufruf('POST', '/prozesse/sollstellung?monat=' + wert('monat') + '&failAfter=' + wert('failAfter')); setTimeout(() => aufgabenLaden(true), 15000); });
+an('forderungen', () => aufruf('GET', '/forderungen?monat=' + wert('monat') + '&limit=3'));
+an('status', () => aufruf('GET', '/batch/' + wert('ausfuehrung')));
+an('neustart', () => aufruf('POST', '/batch/' + wert('ausfuehrung') + '/neustart'));
+an('adresse', () => aufruf('GET', '/adresse/pruefen?plz=' + wert('plz2')));
+an('serie', async () => {
+  const zeilen = [];
+  for (let i = 1; i <= 10; i++) {
+    const r = await aufruf('GET', '/adresse/pruefen?plz=' + wert('plz2'), undefined, i < 10);
+    zeilen.push(i + ': ' + (r.daten.ergebnis || '?') + ' in ' + r.daten.dauerMs + ' ms' + (r.daten.grund ? ' (' + r.daten.grund + ')' : ''));
+  }
+  const pre = document.querySelector('#detail pre:last-of-type');
+  if (pre) pre.textContent = zeilen.join('\n');
+});
+
+aufgabenLaden();
+</script>
+</body>
+</html>

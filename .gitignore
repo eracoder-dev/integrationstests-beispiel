@@ -1,0 +1,5 @@
+# Build-Ausgaben und lokale Zwischenspeicher
+app/target/
+cockpit/target/
+.m2/
+.idea/

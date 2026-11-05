@@ -1,0 +1,40 @@
+# Alarmregeln. Prometheus wertet sie alle 15 Sekunden aus. Ein Alarm hat drei Zustände:
+# inactive (alles gut), pending (Bedingung erfüllt, "for" läuft noch) und firing (Alarm ist ausgelöst).
+# Sie stehen unter http://localhost:9090/alerts. Benachrichtigungen (E-Mail, Chat) verschickt ein
+# Alertmanager. Der ist in dieser Demo nicht eingerichtet.
+groups:
+  - name: antragsbearbeitung
+    rules:
+
+      # Alarm 1: Die Anwendung meldet sich nicht mehr als bereit, oder der Health Check antwortet gar nicht.
+      # Auslösen: docker compose stop wildfly
+      - alert: AnwendungNichtBereit
+        expr: probe_success{job="health", instance="http://wildfly:9990/health/ready"} == 0
+        for: 30s
+        labels:
+          schwere: kritisch
+        annotations:
+          titel: "Anwendung nicht bereit"
+          beschreibung: "/health/ready antwortet seit 30 Sekunden nicht mit OK. Datenbank oder Camunda prüfen."
+
+      # Alarm 2: Transaktionen werden zurückgerollt. Im Normalbetrieb kommt das fast nie vor,
+      # ein abgebrochener Batchlauf erzeugt es sofort.
+      # Auslösen: Sollstellung mit "Abbruch nach" 50 starten.
+      - alert: TransaktionenWerdenZurueckgerollt
+        expr: increase(wildfly_transactions_number_of_application_rollbacks_total[2m]) > 0
+        for: 0s
+        labels:
+          schwere: warnung
+        annotations:
+          titel: "Rollbacks in den letzten 2 Minuten"
+          beschreibung: "Mindestens eine Transaktion wurde zurückgerollt, etwa ein Batchlauf nach einem Fehler. Im Log nach ERROR suchen."
+
+      # Alarm 3: Ein Messziel ist nicht erreichbar, Prometheus bekommt keine Zahlen mehr.
+      - alert: MessungFehlt
+        expr: up == 0
+        for: 1m
+        labels:
+          schwere: kritisch
+        annotations:
+          titel: "Messziel nicht erreichbar"
+          beschreibung: "Prometheus erreicht {{ $labels.job }} nicht. Ohne Zahlen ist auch kein anderer Alarm verlässlich."

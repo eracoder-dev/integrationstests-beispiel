@@ -1,0 +1,10 @@
+# Image für die Integrationstests. Anders als das Dockerfile für den Betrieb baut es die Anwendung nicht
+# selbst, sondern nimmt die fertige WAR aus "mvn package". Der Treiber kommt aus dem Maven-Repository,
+# die WAR aus target/. Beides legt der Test beim Bauen des Images ins Build-Verzeichnis (siehe TestStack).
+FROM quay.io/wildfly/wildfly:39.0.0.Final-jdk21
+COPY --chown=jboss:root postgresql.jar /tmp/postgresql.jar
+COPY --chown=jboss:root konfigurieren.cli /tmp/konfigurieren.cli
+RUN /opt/jboss/wildfly/bin/jboss-cli.sh --command="module add --name=org.postgresql --resources=/tmp/postgresql.jar --dependencies=javax.api,jakarta.transaction.api" \
+ && /opt/jboss/wildfly/bin/jboss-cli.sh --file=/tmp/konfigurieren.cli \
+ && rm -rf /opt/jboss/wildfly/standalone/configuration/standalone_xml_history /tmp/*.cli /tmp/*.jar
+COPY --chown=jboss:root antragsbearbeitung.war /opt/jboss/wildfly/standalone/deployments/ROOT.war

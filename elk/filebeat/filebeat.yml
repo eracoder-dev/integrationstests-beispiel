@@ -1,0 +1,22 @@
+# Filebeat liest die JSON-Logdatei von WildFly und schickt sie an Logstash.
+filebeat.inputs:
+  - type: filestream
+    id: wildfly-json
+    paths:
+      - /logs/app.json
+    parsers:
+      - ndjson:
+          target: ""
+          add_error_key: true
+          overwrite_keys: true
+
+processors:
+  - add_fields:
+      target: ""
+      fields:
+        umgebung: demo
+
+output.logstash:
+  hosts: ["logstash:5044"]
+
+logging.level: warning

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Vertrag der externen SOAP-Schnittstelle "Bonitätsauskunft". Aus dieser Datei wird der Client
+     generiert (wsimport), und die Stub-Antworten der Tests werden gegen das Schema darin geprüft. -->
+<definitions name="BonitaetsService"
+             targetNamespace="http://beispiel.de/bonitaet"
+             xmlns="http://schemas.xmlsoap.org/wsdl/"
+             xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+             xmlns:tns="http://beispiel.de/bonitaet"
+             xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+
+  <types>
+    <xsd:schema targetNamespace="http://beispiel.de/bonitaet" elementFormDefault="qualified"
+                xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:tns="http://beispiel.de/bonitaet">
+
+      <xsd:element name="pruefeBonitaet">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="name" type="xsd:string"/>
+            <xsd:element name="plz" type="xsd:string"/>
+            <xsd:element name="summe" type="xsd:decimal"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+
+      <xsd:complexType name="BonitaetsErgebnis">
+        <xsd:sequence>
+          <xsd:element name="score" type="xsd:int"/>
+          <xsd:element name="bewertung" type="xsd:string"/>
+        </xsd:sequence>
+      </xsd:complexType>
+
+      <xsd:element name="pruefeBonitaetResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="ergebnis" type="tns:BonitaetsErgebnis"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:schema>
+  </types>
+
+  <message name="pruefeBonitaetRequest">
+    <part name="parameters" element="tns:pruefeBonitaet"/>
+  </message>
+  <message name="pruefeBonitaetResponse">
+    <part name="parameters" element="tns:pruefeBonitaetResponse"/>
+  </message>
+
+  <portType name="BonitaetsPort">
+    <operation name="pruefeBonitaet">
+      <input message="tns:pruefeBonitaetRequest"/>
+      <output message="tns:pruefeBonitaetResponse"/>
+    </operation>
+  </portType>
+
+  <binding name="BonitaetsBinding" type="tns:BonitaetsPort">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="pruefeBonitaet">
+      <soap:operation soapAction="http://beispiel.de/bonitaet/pruefeBonitaet"/>
+      <input><soap:body use="literal"/></input>
+      <output><soap:body use="literal"/></output>
+    </operation>
+  </binding>
+
+  <service name="BonitaetsService">
+    <port name="BonitaetsPort" binding="tns:BonitaetsBinding">
+      <soap:address location="http://localhost:8089/soap/bonitaet"/>
+    </port>
+  </service>
+</definitions>

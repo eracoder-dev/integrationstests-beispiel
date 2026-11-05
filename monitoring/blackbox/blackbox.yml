@@ -1,0 +1,9 @@
+# Der Blackbox Exporter ruft Adressen von außen auf, so wie ein Load Balancer es täte.
+modules:
+  health:
+    prober: http
+    timeout: 5s
+    http:
+      method: GET
+      valid_status_codes: [200]   # DOWN liefert Status 503 und gilt damit als Fehler
+      preferred_ip_protocol: ip4

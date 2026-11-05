@@ -1,0 +1,10 @@
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:bon="http://beispiel.de/bonitaet">
+  <soapenv:Body>
+    <bon:pruefeBonitaetResponse>
+      <bon:ergebnis>
+        <bon:score>310</bon:score>
+        <bon:bewertung>SCHLECHT</bon:bewertung>
+      </bon:ergebnis>
+    </bon:pruefeBonitaetResponse>
+  </soapenv:Body>
+</soapenv:Envelope>

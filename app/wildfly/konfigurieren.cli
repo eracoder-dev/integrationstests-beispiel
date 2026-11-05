@@ -1,0 +1,62 @@
+# Wird beim Bau des Images einmal ausgeführt und verändert standalone-microprofile.xml.
+# Das Profil bringt schon mit: Config, Fault Tolerance, Health, OpenAPI, Telemetry, JAX-RS, CDI, JPA, JTA.
+# Es fehlen Jakarta Batch (JBeret), die Datenquelle und das JSON-Logging.
+embed-server --server-config=standalone-microprofile.xml --std-out=echo
+
+# ---- Datenquelle -----------------------------------------------------------
+/subsystem=datasources/jdbc-driver=postgresql:add(driver-name=postgresql, driver-module-name=org.postgresql, driver-xa-datasource-class-name=org.postgresql.xa.PGXADataSource)
+/subsystem=datasources/data-source=AntragsbearbeitungDS:add( \
+    jndi-name=java:jboss/datasources/AntragsbearbeitungDS, \
+    driver-name=postgresql, \
+    connection-url="jdbc:postgresql://${env.DB_HOST:postgres}:5432/${env.DB_NAME:antragsbearbeitung}", \
+    user-name="${env.DB_USER:antragsbearbeitung}", \
+    password="${env.DB_PASSWORD:antragsbearbeitung}", \
+    min-pool-size=5, max-pool-size=30, \
+    validate-on-match=true, background-validation=true, background-validation-millis=30000, \
+    valid-connection-checker-class-name=org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLValidConnectionChecker, \
+    statistics-enabled=true)
+
+# ---- Jakarta Batch (JBeret) ------------------------------------------------
+# Der Stand der Läufe liegt in der Datenbank. Bei einem Serverneustart oder auf mehreren
+# Knoten lässt sich ein abgebrochener Lauf deshalb weiter neu starten.
+/extension=org.wildfly.extension.batch.jberet:add
+batch
+/subsystem=batch-jberet:add(default-thread-pool=batch, default-job-repository=jdbc)
+/subsystem=batch-jberet/in-memory-job-repository=in-memory:add
+/subsystem=batch-jberet/jdbc-job-repository=jdbc:add(data-source=AntragsbearbeitungDS)
+/subsystem=batch-jberet/thread-pool=batch:add(max-threads=10, keepalive-time={time=30, unit=SECONDS})
+run-batch
+
+# ---- SOAP-Client (Jakarta XML Web Services, Apache CXF) --------------------------
+# Das Profil standalone-microprofile.xml bringt das Subsystem "webservices" nicht mit. Ohne es findet
+# die Anwendung keine Implementierung für den SOAP-Client.
+/extension=org.jboss.as.webservices:add
+/subsystem=webservices:add(wsdl-host="${jboss.bind.address:127.0.0.1}", statistics-enabled=false)
+/subsystem=webservices/endpoint-config=Standard-Endpoint-Config:add
+/subsystem=webservices/client-config=Standard-Client-Config:add
+
+# ---- JSON-Logging für ELK --------------------------------------------------
+/subsystem=logging/json-formatter=JSON:add( \
+    exception-output-type=formatted, \
+    date-format="yyyy-MM-dd'T'HH:mm:ss.SSSXXX", \
+    print-details=false, \
+    meta-data={service=antragsbearbeitung})
+/subsystem=logging/size-rotating-file-handler=JSON_DATEI:add( \
+    file={relative-to=jboss.server.log.dir, path=app.json}, \
+    named-formatter=JSON, append=true, autoflush=true, rotate-size=50m, max-backup-index=3)
+/subsystem=logging/root-logger=ROOT:add-handler(name=JSON_DATEI)
+/subsystem=logging/logger=de.beispiel:add(level=INFO)
+/subsystem=logging/logger=org.camunda:add(level=WARN)
+/subsystem=logging/logger=org.jberet:add(level=INFO)
+/subsystem=logging/logger=org.jboss.as.config:remove
+
+# ---- Statistik für das Monitoring --------------------------------------------
+# Ohne diese Schalter liefert /metrics für Transaktionen und Requests nur Nullen: Das Monitoring
+# sähe gesund aus, wäre aber blind.
+/subsystem=transactions:write-attribute(name=statistics-enabled, value=true)
+/subsystem=undertow:write-attribute(name=statistics-enabled, value=true)
+
+# ---- Telemetrie: kein Collector in der Demo, deshalb keine Traces aufzeichnen --
+/subsystem=opentelemetry:write-attribute(name=sampler-type, value=off)
+
+stop-embedded-server

@@ -1,0 +1,28 @@
+server:
+  port: 8081
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:5432/${DB_NAME:antragsbearbeitung}
+    username: ${DB_USER:antragsbearbeitung}
+    password: ${DB_PASSWORD:antragsbearbeitung}
+    driver-class-name: org.postgresql.Driver
+
+camunda:
+  bpm:
+    # Anmeldung an Cockpit, Tasklist und Admin: demo / demo (nur für die lokale Demo)
+    admin-user:
+      id: demo
+      password: demo
+      first-name: Demo
+      last-name: Benutzer
+    # Muss zur Engine der Anwendung passen, sonst verweigert Camunda den Start.
+    history-level: audit
+    database:
+      schema-update: false
+    # Ausführen von Jobs ist Sache der Anwendung.
+    job-execution:
+      enabled: false
+    auto-deployment-enabled: false
+    filter:
+      create: Alle Aufgaben

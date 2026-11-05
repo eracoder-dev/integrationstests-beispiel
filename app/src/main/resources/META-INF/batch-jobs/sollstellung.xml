@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sollstellung: erzeugt für jeden aktiven Vertrag die fällige Monatsforderung.
+     Ein Chunk sind 500 Verträge in einer eigenen Transaktion. Nach jedem Commit merkt sich
+     der Reader die letzte Vertragsnummer als Checkpoint, ein Neustart macht dort weiter. -->
+<job id="sollstellung" version="2.0" xmlns="https://jakarta.ee/xml/ns/jakartaee"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/jobXML_2_0.xsd">
+
+  <listeners>
+    <listener ref="sollstellungListener"/>
+  </listeners>
+
+  <step id="sollstellen">
+    <listeners>
+      <listener ref="skipProtokoll"/>
+    </listeners>
+    <chunk item-count="500" skip-limit="100">
+      <reader ref="faelligeVertraegeReader"/>
+      <processor ref="beitragsberechnung">
+        <properties>
+          <property name="monat" value="#{jobParameters['monat']}"/>
+        </properties>
+      </processor>
+      <writer ref="forderungWriter">
+        <properties>
+          <property name="failAfter" value="#{jobParameters['failAfter']}?:0;"/>
+        </properties>
+      </writer>
+      <!-- Kaputte Datensätze überspringen, aber mit Nummer und Grund protokollieren. -->
+      <skippable-exception-classes>
+        <include class="de.beispiel.antragsbearbeitung.batch.FachlicherFehler"/>
+      </skippable-exception-classes>
+    </chunk>
+  </step>
+</job>

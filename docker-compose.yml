@@ -1,0 +1,192 @@
+# Beispielanwendung "Antragsbearbeitung": WildFly mit MicroProfile, Camunda 7, Jakarta Batch,
+# PostgreSQL, ELK-Stack (kostenlose Basislizenz) und ein WireMock als externer Adressdienst.
+name: antragsbearbeitung
+
+services:
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: antragsbearbeitung
+      POSTGRES_USER: antragsbearbeitung
+      POSTGRES_PASSWORD: antragsbearbeitung
+    volumes:
+      - postgres-daten:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U antragsbearbeitung -d antragsbearbeitung"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Der "externe" Adressdienst. Das Verhalten hängt von der Postleitzahl ab, siehe wiremock/mappings.
+  adressdienst:
+    image: wiremock/wiremock:3.13.1
+    command: ["--global-response-templating"]
+    volumes:
+      - ./wiremock:/home/wiremock:ro
+    ports:
+      - "8089:8080"
+
+  wildfly:
+    build: ./app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      adressdienst:
+        condition: service_started
+    environment:
+      DB_HOST: postgres
+      DB_NAME: antragsbearbeitung
+      DB_USER: antragsbearbeitung
+      DB_PASSWORD: antragsbearbeitung
+      JAVA_OPTS: "-Xms256m -Xmx768m -Djava.net.preferIPv4Stack=true"
+      # MicroProfile Config: Umgebungsvariablen überschreiben microprofile-config.properties
+      ADRESSDIENST_URL: http://adressdienst:8080
+      BONITAETSDIENST_URL: http://adressdienst:8080/soap/bonitaet
+    command: ["/opt/jboss/wildfly/bin/standalone.sh", "-c", "standalone-microprofile.xml", "-b", "0.0.0.0", "-bmanagement", "0.0.0.0"]
+    volumes:
+      - wildfly-logs:/opt/jboss/wildfly/standalone/log
+    ports:
+      - "8080:8080"   # Anwendung, /openapi
+      - "9990:9990"   # Verwaltung: /health, /metrics
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9990 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  # Camunda Cockpit, Tasklist und Admin als eigener Dienst auf derselben Datenbank.
+  # Die Engine der Anwendung ist eingebettet und bringt keine Oberfläche mit. Dieser Dienst liest
+  # nur die Camunda-Tabellen und führt selbst keine Jobs aus. Anmeldung: demo / demo.
+  cockpit:
+    build: ./cockpit
+    depends_on:
+      wildfly:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_NAME: antragsbearbeitung
+      DB_USER: antragsbearbeitung
+      DB_PASSWORD: antragsbearbeitung
+    ports:
+      - "8083:8081"   # Host-Port 8083, weil 8081 und 8082 häufig belegt sind
+
+  # ---- Monitoring: Prometheus, Blackbox Exporter, Grafana ---------------------------
+  # Prometheus holt die Metriken des Servers ab und wertet die Alarmregeln aus. Der Blackbox Exporter
+  # ruft die Health Checks von außen auf. Grafana zeigt beides. Alarme stehen unter :9090/alerts.
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=3d"]
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alarme.yml:/etc/prometheus/alarme.yml:ro
+      - prometheus-daten:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - blackbox
+
+  blackbox:
+    image: prom/blackbox-exporter:v0.27.0
+    command: ["--config.file=/config/blackbox.yml"]
+    volumes:
+      - ./monitoring/blackbox/blackbox.yml:/config/blackbox.yml:ro
+
+  # Anmeldung ist für die lokale Demo abgeschaltet: Jeder auf diesem Rechner sieht das Dashboard.
+  grafana:
+    image: grafana/grafana-oss:12.1.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/antragsbearbeitung.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-daten:/var/lib/grafana
+    ports:
+      - "3030:3000"   # Host-Port 3030, weil 3000 häufig belegt ist
+    depends_on:
+      - prometheus
+
+  # ---- ELK ------------------------------------------------------------------
+  # Elasticsearch, Logstash und Kibana laufen hier mit der kostenlosen Basislizenz.
+  # Die Sicherheitsfunktionen sind für die lokale Demo abgeschaltet.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.2.0
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.license.self_generated.type: basic
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - es-daten:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:9.2.0
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      LS_JAVA_OPTS: "-Xms384m -Xmx384m"
+      XPACK_MONITORING_ENABLED: "false"
+    volumes:
+      - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:9.2.0
+    user: root
+    depends_on:
+      - logstash
+    command: ["filebeat", "-e", "--strict.perms=false"]
+    volumes:
+      - ./elk/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - wildfly-logs:/logs:ro
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.2.0
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      NODE_OPTIONS: "--max-old-space-size=768"
+    ports:
+      - "5601:5601"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q '\"level\":\"available\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+
+  # Legt einmalig die Data View "antragsbearbeitung-logs-*" in Kibana an und beendet sich dann.
+  kibana-einrichten:
+    image: curlimages/curl:8.14.1
+    depends_on:
+      kibana:
+        condition: service_healthy
+    restart: "no"
+    volumes:
+      - ./elk/kibana-einrichten.sh:/einrichten.sh:ro
+    entrypoint: ["sh", "/einrichten.sh"]
+
+volumes:
+  postgres-daten:
+  wildfly-logs:
+  es-daten:
+  prometheus-daten:
+  grafana-daten:

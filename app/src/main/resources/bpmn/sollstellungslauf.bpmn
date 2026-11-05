@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="Definitions_Sollstellung" targetNamespace="http://beispiel.de/antragsbearbeitung">
+
+  <!-- Camunda steuert den Lauf, Jakarta Batch verarbeitet die Masse: Der Prozess startet den
+       Batchjob, wartet in einer Schleife auf sein Ende und holt bei einem Fehler einen Menschen. -->
+  <bpmn:process id="sollstellungslauf" name="Sollstellungslauf" isExecutable="true" camunda:historyTimeToLive="30">
+
+    <bpmn:startEvent id="Start" name="Lauf angefordert">
+      <bpmn:outgoing>F1</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Starten" name="Sollstellung starten" camunda:asyncBefore="true"
+                      camunda:delegateExpression="${batchStarten}">
+      <bpmn:incoming>F1</bpmn:incoming>
+      <bpmn:outgoing>F2</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:intermediateCatchEvent id="Warten" name="3 Sekunden warten">
+      <bpmn:incoming>F2</bpmn:incoming>
+      <bpmn:incoming>F_Schleife</bpmn:incoming>
+      <bpmn:outgoing>F3</bpmn:outgoing>
+      <bpmn:timerEventDefinition>
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT3S</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:serviceTask id="Status" name="Status prüfen" camunda:delegateExpression="${statusAbfrage}">
+      <bpmn:incoming>F3</bpmn:incoming>
+      <bpmn:outgoing>F4</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="GW_Status" name="Lauf beendet?" default="F_Schleife">
+      <bpmn:incoming>F4</bpmn:incoming>
+      <bpmn:outgoing>F_Fertig</bpmn:outgoing>
+      <bpmn:outgoing>F_Fehler</bpmn:outgoing>
+      <bpmn:outgoing>F_Schleife</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Fehler" name="Fehler prüfen" camunda:candidateGroups="betrieb">
+      <bpmn:incoming>F_Fehler</bpmn:incoming>
+      <bpmn:outgoing>F5</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:endEvent id="Ende_OK" name="Lauf abgeschlossen">
+      <bpmn:incoming>F_Fertig</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="Ende_Fehler" name="Fehler bearbeitet">
+      <bpmn:incoming>F5</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="F1" sourceRef="Start" targetRef="Starten"/>
+    <bpmn:sequenceFlow id="F2" sourceRef="Starten" targetRef="Warten"/>
+    <bpmn:sequenceFlow id="F3" sourceRef="Warten" targetRef="Status"/>
+    <bpmn:sequenceFlow id="F4" sourceRef="Status" targetRef="GW_Status"/>
+    <bpmn:sequenceFlow id="F_Fertig" name="COMPLETED" sourceRef="GW_Status" targetRef="Ende_OK">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${batchStatus == 'COMPLETED'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_Fehler" name="FAILED" sourceRef="GW_Status" targetRef="Fehler">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${batchStatus == 'FAILED' || batchStatus == 'STOPPED' || batchStatus == 'ABANDONED'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="F_Schleife" name="läuft noch" sourceRef="GW_Status" targetRef="Warten"/>
+    <bpmn:sequenceFlow id="F5" sourceRef="Fehler" targetRef="Ende_Fehler"/>
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="Diagramm_Sollstellung">
+    <bpmndi:BPMNPlane id="Ebene_Sollstellung" bpmnElement="sollstellungslauf">
+      <bpmndi:BPMNShape id="Start_di" bpmnElement="Start"><dc:Bounds x="152" y="102" width="36" height="36"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="130" y="145" width="80" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Starten_di" bpmnElement="Starten"><dc:Bounds x="240" y="80" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Warten_di" bpmnElement="Warten"><dc:Bounds x="402" y="102" width="36" height="36"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="380" y="145" width="80" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Status_di" bpmnElement="Status"><dc:Bounds x="500" y="80" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_Status_di" bpmnElement="GW_Status" isMarkerVisible="true"><dc:Bounds x="665" y="95" width="50" height="50"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="655" y="65" width="70" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Fehler_di" bpmnElement="Fehler"><dc:Bounds x="760" y="200" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Ende_OK_di" bpmnElement="Ende_OK"><dc:Bounds x="862" y="102" width="36" height="36"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="842" y="145" width="76" height="27"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Ende_Fehler_di" bpmnElement="Ende_Fehler"><dc:Bounds x="922" y="222" width="36" height="36"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="900" y="265" width="80" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="F1_di" bpmnElement="F1"><di:waypoint x="188" y="120"/><di:waypoint x="240" y="120"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F2_di" bpmnElement="F2"><di:waypoint x="340" y="120"/><di:waypoint x="402" y="120"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F3_di" bpmnElement="F3"><di:waypoint x="438" y="120"/><di:waypoint x="500" y="120"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F4_di" bpmnElement="F4"><di:waypoint x="600" y="120"/><di:waypoint x="665" y="120"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Fertig_di" bpmnElement="F_Fertig"><di:waypoint x="715" y="120"/><di:waypoint x="862" y="120"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="760" y="102" width="70" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Fehler_di" bpmnElement="F_Fehler"><di:waypoint x="690" y="145"/><di:waypoint x="690" y="240"/><di:waypoint x="760" y="240"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="640" y="190" width="40" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F_Schleife_di" bpmnElement="F_Schleife"><di:waypoint x="690" y="95"/><di:waypoint x="690" y="40"/><di:waypoint x="420" y="40"/><di:waypoint x="420" y="102"/>
+        <bpmndi:BPMNLabel><dc:Bounds x="520" y="22" width="60" height="14"/></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="F5_di" bpmnElement="F5"><di:waypoint x="860" y="240"/><di:waypoint x="922" y="240"/></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

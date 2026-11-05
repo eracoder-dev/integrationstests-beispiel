@@ -1,0 +1,9 @@
+{
+  "name": "Dienst fällt jeden zweiten Aufruf aus, zweiter Aufruf (PLZ 22222)",
+  "priority": 1,
+  "scenarioName": "flackern",
+  "requiredScenarioState": "Fehler",
+  "newScenarioState": "Started",
+  "request": { "method": "GET", "urlPath": "/adressen/pruefen", "queryParameters": { "plz": { "equalTo": "22222" } } },
+  "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "jsonBody": { "gueltig": true } }
+}

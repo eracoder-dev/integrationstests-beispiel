@@ -1,0 +1,21 @@
+{
+  "name": "SOAP antwortet sehr langsam (Name enthält Langsam)",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/soap/bonitaet",
+    "bodyPatterns": [
+      {
+        "contains": "Langsam"
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "text/xml; charset=utf-8"
+    },
+    "body": "<soapenv:Envelope xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\" xmlns:bon=\"http://beispiel.de/bonitaet\">\n  <soapenv:Body>\n    <bon:pruefeBonitaetResponse>\n      <bon:ergebnis>\n        <bon:score>720</bon:score>\n        <bon:bewertung>GUT</bon:bewertung>\n      </bon:ergebnis>\n    </bon:pruefeBonitaetResponse>\n  </soapenv:Body>\n</soapenv:Envelope>\n",
+    "fixedDelayMilliseconds": 6000
+  }
+}

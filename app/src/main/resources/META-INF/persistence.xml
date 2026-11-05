@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence xmlns="https://jakarta.ee/xml/ns/persistence" version="3.2">
+  <persistence-unit name="antragsbearbeitung" transaction-type="JTA">
+    <jta-data-source>java:jboss/datasources/AntragsbearbeitungDS</jta-data-source>
+    <class>de.beispiel.antragsbearbeitung.domain.Vertrag</class>
+    <class>de.beispiel.antragsbearbeitung.domain.Forderung</class>
+    <class>de.beispiel.antragsbearbeitung.domain.Antrag</class>
+    <class>de.beispiel.antragsbearbeitung.domain.AuditEintrag</class>
+    <exclude-unlisted-classes>true</exclude-unlisted-classes>
+    <properties>
+      <!-- Das Schema kommt aus db/init/01-schema.sql, Hibernate prüft es nur. -->
+      <property name="hibernate.hbm2ddl.auto" value="validate"/>
+    </properties>
+  </persistence-unit>
+</persistence>
