@@ -18,6 +18,7 @@ import org.camunda.bpm.engine.task.Task;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -85,13 +86,15 @@ class ProzessTest {
     }
 
     @Test
-    void startKehrtZurueckOhneDenRisikoschrittAuszufuehren() {
+    @DisplayName("Der Start kehrt zurück, ohne den Risikoschritt auszuführen")
+    void startOhneRisikoschritt() {
         antragStarten("00001");
         assertThat(aufrufe).isEmpty();
     }
 
     @Test
-    void kleinerAntragWirdAutomatischPoliciert() {
+    @DisplayName("Ein kleiner Antrag wird automatisch policiert")
+    void kleinerAntragPoliciert() {
         ProcessInstance instanz = antragStarten("00001");
         ersteJobsAusfuehren(instanz);
 
@@ -100,7 +103,8 @@ class ProzessTest {
     }
 
     @Test
-    void sonstigerAntragWartetAufDieManuellePruefungUndWirdAngenommen() {
+    @DisplayName("Ein sonstiger Antrag wartet auf die manuelle Prüfung und wird angenommen")
+    void manuellAngenommen() {
         ProcessInstance instanz = antragStarten("80331");
         ersteJobsAusfuehren(instanz);
 
@@ -113,7 +117,8 @@ class ProzessTest {
     }
 
     @Test
-    void manuelleAblehnungFuehrtZurAblehnung() {
+    @DisplayName("Eine manuelle Ablehnung führt zur Ablehnung")
+    void manuellAbgelehnt() {
         ProcessInstance instanz = antragStarten("80331");
         ersteJobsAusfuehren(instanz);
         Task aufgabe = engine.getTaskService().createTaskQuery().processInstanceId(instanz.getId()).singleResult();
@@ -123,7 +128,8 @@ class ProzessTest {
     }
 
     @Test
-    void ungueltigeAdresseWirdOhneWiederholungAbgelehnt() {
+    @DisplayName("Eine ungültige Adresse wird ohne Wiederholung abgelehnt")
+    void ungueltigeAdresse() {
         ProcessInstance instanz = antragStarten("11111");
         ersteJobsAusfuehren(instanz);
 
@@ -133,7 +139,8 @@ class ProzessTest {
     }
 
     @Test
-    void sollstellungslaufWartetInDerSchleifeBisDerBatchBeendetIst() {
+    @DisplayName("Der Sollstellungslauf wartet in der Schleife, bis der Batch beendet ist")
+    void sollstellungslaufWartet() {
         batchStatus.addAll(List.of("STARTED", "STARTED", "COMPLETED"));
         ProcessInstance instanz = engine.getRuntimeService().startProcessInstanceByKey("sollstellungslauf",
                 Map.of("monat", "2026-11", "failAfter", 0));
@@ -150,7 +157,8 @@ class ProzessTest {
     }
 
     @Test
-    void fehlgeschlagenerBatchlaufHoltEinenMenschen() {
+    @DisplayName("Ein fehlgeschlagener Batchlauf holt einen Menschen")
+    void batchFehler() {
         batchStatus.add("FAILED");
         ProcessInstance instanz = engine.getRuntimeService().startProcessInstanceByKey("sollstellungslauf",
                 Map.of("monat", "2026-12", "failAfter", 0));
