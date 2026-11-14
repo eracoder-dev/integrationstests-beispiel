@@ -14,6 +14,7 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 import javax.xml.validation.Validator;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -67,17 +68,20 @@ class SoapVertragTest {
     }
 
     @Test
-    void stubAntwortGutPasstZurWsdl() throws Exception {
+    @DisplayName("Die gute Stub-Antwort passt zur WSDL")
+    void antwortGut() throws Exception {
         pruefe(inhalt("antwort-gut.xml"));
     }
 
     @Test
-    void stubAntwortSchlechtPasstZurWsdl() throws Exception {
+    @DisplayName("Die schlechte Stub-Antwort passt zur WSDL")
+    void antwortSchlecht() throws Exception {
         pruefe(inhalt("antwort-schlecht.xml"));
     }
 
     @Test
-    void einFaultHatKeinenInhaltImSinneDerWsdl() throws Exception {
+    @DisplayName("Ein Fault hat keinen Inhalt im Sinne der WSDL")
+    void fault() throws Exception {
         // Ein Fault ist im SOAP-Umschlag etwas anderes als eine Antwort der Operation.
         Element fault = inhalt("fault-server.xml");
         assertThat(fault.getLocalName()).isEqualTo("Fault");
@@ -85,7 +89,8 @@ class SoapVertragTest {
     }
 
     @Test
-    void eineFalscheAntwortWirdErkannt() throws Exception {
+    @DisplayName("Eine falsche Antwort wird erkannt")
+    void falscheAntwort() throws Exception {
         Element antwort = inhalt("antwort-gut.xml");
         // Das Pflichtfeld "bewertung" entfernen: So sähe ein Stub aus, der vom Vertrag abweicht.
         Node ergebnis = antwort.getElementsByTagNameNS("http://beispiel.de/bonitaet", "ergebnis").item(0);
