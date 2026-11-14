@@ -22,6 +22,9 @@ jobs:
       - name: Unit-Tests
         working-directory: app
         run: mvn -B --no-transfer-progress test
+      - name: Testergebnisse anzeigen
+        if: always()
+        run: python3 .github/scripts/testzusammenfassung.py "Unit-Tests" app/target/surefire-reports >> "$GITHUB_STEP_SUMMARY"
 
   integration-tests:
     needs: unit-tests
@@ -37,6 +40,9 @@ jobs:
       - name: Bauen und Integrationstests
         working-directory: app
         run: mvn -B --no-transfer-progress verify
+      - name: Testergebnisse anzeigen
+        if: always()
+        run: python3 .github/scripts/testzusammenfassung.py "Integrationstests" app/target/failsafe-reports >> "$GITHUB_STEP_SUMMARY"
       - name: Testberichte sichern
         if: always()
         uses: actions/upload-artifact@v7
