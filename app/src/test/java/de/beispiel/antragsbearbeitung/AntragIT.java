@@ -14,6 +14,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -43,7 +44,8 @@ class AntragIT {
     // ---- die Tests -----------------------------------------------------------------------------------
 
     @Test
-    void gutesBonitaetsurteilFuehrtBeiKleinerSummeZurPoliceUndWirdDemDienstKorrektGemeldet() throws Exception {
+    @DisplayName("Gutes Bonitätsurteil bei kleiner Summe: Antrag wird zur Police und dem Dienst korrekt gemeldet")
+    void erfolg() throws Exception {
         soapStub(200, TestStack.lesen("soap/antwort-gut.xml"), 0);
 
         String nummer = antragStellen("Erika Mueller", "80331", 150000);
@@ -56,7 +58,8 @@ class AntragIT {
     }
 
     @Test
-    void schlechtesBonitaetsurteilSchicktDenAntragInDieManuellePruefung() throws Exception {
+    @DisplayName("Schlechtes Bonitätsurteil schickt den Antrag in die manuelle Prüfung")
+    void schlechtesUrteil() throws Exception {
         soapStub(200, TestStack.lesen("soap/antwort-schlecht.xml"), 0);
 
         String nummer = antragStellen("Max Schlechtzahler", "80331", 100000);
@@ -67,7 +70,8 @@ class AntragIT {
     }
 
     @Test
-    void einSoapFaultWirdWiederholtUndFuehrtDannInDieManuellePruefungStattZumFehler() throws Exception {
+    @DisplayName("SOAP-Fault wird wiederholt und führt dann in die manuelle Prüfung statt zum Fehler")
+    void soapFault() throws Exception {
         soapStub(500, TestStack.lesen("soap/fault-server.xml"), 0);
 
         String nummer = antragStellen("Frieda Fehlerfall", "80331", 100000);
@@ -80,7 +84,8 @@ class AntragIT {
     }
 
     @Test
-    void einLangsamerDienstBlockiertWederDenAufrufNochDenProzess() throws Exception {
+    @DisplayName("Ein langsamer Dienst blockiert weder den Aufruf noch den Prozess")
+    void langsamerDienst() throws Exception {
         soapStub(200, TestStack.lesen("soap/antwort-gut.xml"), 6000);
 
         long start = System.nanoTime();
@@ -94,7 +99,8 @@ class AntragIT {
     }
 
     @Test
-    void eineUngueltigeAdresseWirdAbgelehntOhneDenBonitaetsdienstZuFragen() throws Exception {
+    @DisplayName("Eine ungültige Adresse wird abgelehnt, ohne den Bonitätsdienst zu fragen")
+    void ungueltigeAdresse() throws Exception {
         // PLZ 11111 liefert der Adressdienst-Stub als fachlich ungültig (siehe wiremock/mappings).
         String nummer = antragStellen("Hans Falsch", "11111", 100000);
 
